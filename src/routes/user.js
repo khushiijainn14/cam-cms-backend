@@ -6,6 +6,10 @@ const { upload, uploadImage, getImages } = require('../controllers/imageControll
 const db = require('../database/config');
 const express = require('express');
 const authMiddleware = require('../middleware/jwtAuthMiddleware');
+const {
+  getTemplatePreview
+} = require("../controllers/templateControllers");
+
 
 const router = express.Router();
 
@@ -51,5 +55,8 @@ router.delete('/deleteCollectionItem/:id', deleteCollectionItem);
 router.post('/bindSectionToCollection', bindSectionToCollection);
 router.post('/uploadImage', upload.single('image'), uploadImage);
 router.get('/getImages', getImages);
+router.get("/:templateId/preview", getTemplatePreview);
+
+
 
 module.exports = router;

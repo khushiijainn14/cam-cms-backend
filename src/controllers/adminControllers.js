@@ -201,7 +201,20 @@ exports.updateSection = async (req, res) => {
 
 exports.reorderSections = async (req, res) => {
     try {
-        const { templateId, sectionId, prevOrder, nextOrder } = req.body;
+        const { templateId, sectionId, prevOrder, nextOrder, orderedIds } = req.body;
+
+        if (Array.isArray(orderedIds) && templateId) {
+            for (let i = 0; i < orderedIds.length; i++) {
+                const sId = orderedIds[i];
+                const orderVal = 50 + (i + 1) * 50;
+                await db.query(
+                    `UPDATE sections SET section_order = $1 WHERE id = $2 AND template_id = $3`,
+                    [orderVal, sId, templateId]
+                );
+            }
+            return res.status(200).json({ message: "Sections reordered successfully" });
+        }
+
         if (!templateId || !sectionId || prevOrder == null || nextOrder == null) {
             return res.status(400).json({ message: "Invalid request data" });
         }
@@ -235,7 +248,21 @@ exports.updateTemplateName = async (req, res) => {
 
 exports.getAllTemplates = async (req, res) => {
     try {
-        const result = await db.query(`SELECT t.*, (SELECT json_agg(s.* ORDER BY s.section_order)  FROM sections s WHERE s.template_id = t.id) as sections FROM templates t  ORDER BY t.id DESC  `);
+        const result = await db.query(`
+            SELECT t.*, 
+            (
+                SELECT json_agg(s.* ORDER BY s.section_order)  
+                FROM sections s 
+                WHERE s.template_id = t.id 
+                  AND (
+                      s.page_id = (SELECT id FROM pages WHERE template_id = t.id ORDER BY created_at ASC LIMIT 1)
+                      OR (s.page_id IS NULL AND s.section_type = 'other')
+                      OR s.section_type IN ('header', 'footer')
+                  )
+            ) as sections 
+            FROM templates t  
+            ORDER BY t.id DESC  
+        `);
         res.status(200).json(result.rows);
     } catch (err) {
         console.error("errorrrrr", err);

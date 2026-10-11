@@ -43,7 +43,7 @@ exports.Login = async (req, res) => {
         const user = result.rows[0];
         const isMatch = await argon2.verify(user.password, password);
         if (!isMatch) {
-            return res.status(400).json({ message: "Invalid credentials" });
+            return res.status(400).json({ message: "Invalid credentials! Password does not matched " });
         }
         const accessToken = jwt.sign(
             { id: user.id, role: user.role },

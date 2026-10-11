@@ -93,6 +93,7 @@ exports.getSectionsByPage = async (req, res) => {
         const sections = await db.query(`
             SELECT * FROM sections 
             WHERE (page_id = $1 AND section_type = 'other')
+               OR (page_id IS NULL AND template_id = $2 AND section_type = 'other')
                OR (template_id = $2 AND section_type IN ('header', 'footer'))
             ORDER BY "section_order"
         `, [pageId, templateId]);
