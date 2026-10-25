@@ -53,10 +53,45 @@ router.get('/getCollectionItems/:id', getCollectionItems);
 router.post('/addCollectionItem', addCollectionItem);
 router.delete('/deleteCollectionItem/:id', deleteCollectionItem);
 router.post('/bindSectionToCollection', bindSectionToCollection);
-router.post('/uploadImage', upload.single('image'), uploadImage);
+router.post('/uploadImage', (req, res, next) => {
+    upload.single('image')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({ message: 'File is too large. Maximum file size is 5MB.' });
+            }
+            return res.status(400).json({ message: err.message || 'File upload failed' });
+        }
+        next();
+    });
+}, uploadImage);
 router.get('/getImages', getImages);
+const {
+  useTemplate,
+  getUserWebsites,
+  getWebsiteById,
+  getWebsiteSectionsByPage,
+  updateWebsiteSection,
+  addWebsiteSection,
+  reorderWebsiteSections,
+  deleteWebsiteSection,
+  duplicateWebsiteSection,
+  updateWebsiteName
+} = require('../controllers/websiteControllers');
+
 router.get("/:templateId/preview", getTemplatePreview);
+router.get("/template/:templateId/preview", getTemplatePreview);
 
+// User-Owned Website Management (Protected Routes)
+router.post('/websites/use-template', authMiddleware, useTemplate);
+router.post('/useTemplate', authMiddleware, useTemplate);
+router.get('/websites', authMiddleware, getUserWebsites);
+router.get('/websites/:id', authMiddleware, getWebsiteById);
+router.get('/websites/:websiteId/pages/:pageId/sections', authMiddleware, getWebsiteSectionsByPage);
+router.put('/websites/:websiteId/sections/:sectionId', authMiddleware, updateWebsiteSection);
+router.post('/websites/:websiteId/sections', authMiddleware, addWebsiteSection);
+router.post('/websites/:websiteId/sections/reorder', authMiddleware, reorderWebsiteSections);
+router.delete('/websites/:websiteId/sections/:sectionId', authMiddleware, deleteWebsiteSection);
+router.post('/websites/:websiteId/sections/:sectionId/duplicate', authMiddleware, duplicateWebsiteSection);
+router.put('/websites/:websiteId/name', authMiddleware, updateWebsiteName);
 
-
-module.exports = router;
+module.exports = router;

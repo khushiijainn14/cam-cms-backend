@@ -11,12 +11,14 @@ exports.ToolboxElements = async (req, res) => {
     }
 }
 exports.createTemplate = async (req, res) => {
-    // we have to create a new row in the templates table
     try {
+        const { name, category, description } = req.body || {};
         const result = await db.query(`Insert into templates (name) values ('temp') returning id`);
         const id = result.rows[0].id;
-        const defaultName = `Template ${id}`;
-        await db.query(`UPDATE templates SET name = $1 WHERE id = $2`, [defaultName, id]);
+        const defaultName = (name && name.trim()) || `Template ${id}`;
+        const templateCategory = (category && category.trim()) || 'Business';
+        const templateDescription = (description && description.trim()) || '';
+        await db.query(`UPDATE templates SET name = $1, category = $2, description = $3 WHERE id = $4`, [defaultName, templateCategory, templateDescription, id]);
 
         // Create default "Home" page
         const pageResult = await db.query(
@@ -159,7 +161,7 @@ exports.createTemplate = async (req, res) => {
 
         const sections = await db.query(`SELECT * FROM sections WHERE template_id = $1 ORDER BY "section_order"`, [id]);
 
-        res.json({ id, name: defaultName, sections: sections.rows, defaultPageId: pageId });
+        res.json({ id, name: defaultName, category: templateCategory, description: templateDescription, sections: sections.rows, defaultPageId: pageId });
     } catch (err) {
         console.error(err);
         res.status(500).send("Server side error");
@@ -232,14 +234,22 @@ exports.reorderSections = async (req, res) => {
 
 exports.updateTemplateName = async (req, res) => {
     try {
-        const { templateId, name } = req.body;
-        if (!templateId || !name) {
-            return res.status(400).json({ message: "Template ID and name are required" });
+        const { templateId, name, category, description } = req.body;
+        if (!templateId) {
+            return res.status(400).json({ message: "Template ID is required" });
         }
 
-        await db.query(`UPDATE templates SET name = $1 WHERE id = $2`, [name, templateId]);
+        await db.query(
+            `UPDATE templates 
+             SET name = COALESCE($1, name),
+                 category = COALESCE($2, category),
+                 description = COALESCE($3, description),
+                 updated_at = NOW()
+             WHERE id = $4`,
+            [name, category, description, templateId]
+        );
 
-        res.status(200).json({ message: "Template name updated successfully" });
+        res.status(200).json({ message: "Template updated successfully" });
     } catch (err) {
         console.error("updateTemplateName db err", err);
         res.status(500).json({ message: "Server error" });
@@ -248,7 +258,8 @@ exports.updateTemplateName = async (req, res) => {
 
 exports.getAllTemplates = async (req, res) => {
     try {
-        const result = await db.query(`
+        const { category } = req.query;
+        let query = `
             SELECT t.*, 
             (
                 SELECT json_agg(s.* ORDER BY s.section_order)  
@@ -261,8 +272,15 @@ exports.getAllTemplates = async (req, res) => {
                   )
             ) as sections 
             FROM templates t  
-            ORDER BY t.id DESC  
-        `);
+        `;
+        const params = [];
+        if (category && category !== 'All' && category !== 'All Templates') {
+            query += ` WHERE LOWER(t.category) = LOWER($1) `;
+            params.push(category);
+        }
+        query += ` ORDER BY t.id DESC `;
+
+        const result = await db.query(query, params);
         res.status(200).json(result.rows);
     } catch (err) {
         console.error("errorrrrr", err);
